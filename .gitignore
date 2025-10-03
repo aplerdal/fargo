@@ -1,0 +1,9 @@
+*.o
+*.92p
+# Binaries
+bin/flinker
+bin/fargo
+bin/sum92
+bin/romconv
+# a68k
+a68k/A68k

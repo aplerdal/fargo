@@ -1,0 +1,1137 @@
+A68k - things to do as of September 30, 1991
+
+
+*** BUGS ***
+
+  - It doesn't give an error if a local label is used that has not been
+defined.  (Timo Rossi)
+
+Branches coded with an explicit length (.S or .W) should not be optimized.
+(Timo Rossi, Risto Paasivirta)
+
+
+*** ENHANCEMENTS ***
+
+Add support for BLO and BHS (synonyms for BCS and BCC respectively).
+Do the same for DBcc and Scc.
+
+Add a warning mechanism for such errors as word operations on an odd
+address or a missing END statement.  (Timo Rossi)
+
+Process (An,Dn) as 0(An,Dn) - beware of 68020 variant!
+
+Add a post-assembly pass through the object code file
+to coagulate sections.
+
+Implement an ARexx interface to an editor (e.g. CED) for debugging.
+
+Improve the small code / small data option - study linker documentation!
+
+Wild optimizations? (e.g. MOVE.W #0,D0 -> CLR.W D0)
+                    (MOVE.L #16,D0 -> MOVE.W #16,D0 -> MOVEQ #16,D0)
+
+Treat (An,Dn) as 0(An,Dn)?  Or just leave for 68020 upgrade?
+
+Add 68010/68020/68030/68881/68882 support.
+
+
+Anyway while working on the above I came up with a little wish list for A68k:
+  1) If an END statement is missing from the end of the input file it
+     should be reported as a warning not an error i.e. the object file is not
+     removed for this type of error.
+  2) For A68k MACRO calls to be able to accept a quoted string as an argument
+     without the need for brackets.  When the macro does the substitution of
+     such an argument it should include the quotes.
+  3) Some way of specifying SETQ values in the argument list.  Like the -D
+     option in 'C' i.e. -DFRED=10.
+  4) A jump/branch-conditional assembler op.  68000 branch (Bcc) instructions
+     can only branch to a location +/- 32K away.  What I would like to see in
+     A68k are opcodes (i.e. JBxx) which would insert the necessary code to do
+     a long jump if the target of the branch was greater than 32k away.  This
+     is only required for 68000 code of course since 68020's and up support
+     32 bit displacement. An example,
+                JBEQ  target  ; branch if equal to target
+                              ; where target is a long
+                              ; way away
+
+     the assembler would produce code equivalent to:
+
+                BNE   skip
+                JMP   target
+         skip:                ; next instruction
+
+I hope I have given you some ideas and I look forward to your next release of
+A68k.
+
+Cheers,
+Paul Gittings
+
+
+Treat labels starting with a period as local labels (same as backslash).
+Discuss this one to make sure it doesn't break any existing programs.
+(Erik Lundevall)
+
+
+Thu Jun 28 02:00:02 1990
+Letter  : 189292    From: rsoft!van-bc!uunet.UUCP!cmr.ncsl.nist.gov!ant
+Subject : a68k V2.61
+
+
+To: Charlie_Gibbs@mindlink.UUCP
+
+It's me again...
+
+I was working on gcc-1.37.1 and a68k-V2.61, I came up with the following patch
+for V2.61 for my uses:
+
+----------------- a68k.patch -------------------------
+*** A68kdef.h
+23a24,40
+> /*
+>  * The following added by John Antonishek ant@cmr.ncsl.nist.gov
+>  * 6/21/90
+>  */
+> #ifdef sun
+>
+> #define       _toupper(c)     ((c)-'a'+'A')
+> #define       _tolower(c)     ((c)-'A'+'a')
+> #undef toupper
+> #undef tolower
+> #define       toupper(c)      (islower(c) ? _toupper(c) : (c))
+> #define       tolower(c)      (isupper(c) ? _tolower(c) : (c))
+>
+> #endif
+> /*
+>  * end ant
+>  */
+*** Adirect.c
+213a214,230
+>                   /*
+>                    * The following added by John Antonishek
+>                    * (provided a quick fix, may not be correct...)
+>                    * ant@cmr.ncsl.nist.gov 6/21/90
+>                    */
+>                     else {
+>                       /*
+>                        * added by John Antonishek
+>                        */
+>                       Sym->Flags &= ~1;       /* clear XREF flag. */
+>                       Sym->Flags |= 2;        /* Set XDEF flag. */
+>                       Sym->Defn = NODEF;
+>                       Sym->Hunk = CurrHunk;
+>                   }
+>                   /*
+>                    * end ant
+>                    */
+----------------- a68k.patch -------------------------
+
+The patch for Adirect.c is questionable.  What happen was, when I tried to
+compile gawk, there was one include file for structures and externs, but ONE
+file actual declared the extern AFTER including the common include file
+(which is legal in C).  So, you get the following file:
+                XREF    _foo
+                .
+                .
+                .
+                XDEF    _foo
+                dc.b    'hello'
+
+But, a68k DIDN'T put the _foo label definition in the .o file so blink failed.
+Let me know the fix you decide (if you decide it's a "bug");
+
+Thanks for the support.
+
+-John
+ant@cmr.ncsl.nist.gov
+
+ps.  I would love to use the NEAR directive on a68k, but first I have to
+     figure out how to coalesce sections, because gcc spits sections out like:
+
+        SECTION CODE
+        ...
+        SECTION DATA
+        ...
+        SECTION CODE
+        ...
+        SECTION DATA
+
+     But, A68k doesn't like that, plus doing the initialization of A4 before
+     the NEAR is too hard...
+
+     How about a "FLOAT" directive?  like:  FLOAT 2.3  (or maybe dc.f 2.3,2.4)
+     That was I wouldn't have to fix gcc :-)
+
+
+Sun Jul 29 15:00:04 1990
+Letter  : 196009    From: rsoft!van-bc!uunet.UUCP!compuserve.com!73340.2617
+Subject : Assembler bugs v2.6
+
+To: Gibbs <rsoft!mindlink!Charlie_Gibbs@van-bc.UUCP>
+
+
+
+Charlie,
+        Hi!  I am a big fan of your assembler, and I use it all the time (all
+I program is assembler).  However, I have found a few bugs that I'd like to
+report (actually, I've discovered them some time ago, but I'm just now
+getting to report them.)  Anyway, I hope you're still supporting this fine
+product, and that we'll see an update soon. (I am currently using v2.6.  Please
+let me know if a newer version exists, and where I can get it).
+
+Anyway, the bugs:
+  For one thing, a bset.l #0,d0 generates an illegal instruction.  Also, a
+  dc.l %(32 binary digits), gives an operand size error.  One last thing,
+  I am trying to use a macro to compile a string like this:
+
+MYMAC: MACRO    * a string
+\STRING\@:      dc.b    \1,0
+ END
+
+
+MYMAC ';'
+
+This code generates a error stating that the string isn't finished, and the
+output line looks something like this.
+                dc.b    ',0
+Is there a way around this behavior??
+
+I can be reached by email at
+        ai301@cleveland.freenet.edu   -or-
+        73340.2617@compuserve.com
+(I'm new to compuserve, so that second address might not work.  I prefer the
+first one.)
+Real mail:
+        Greg Roberts II
+        2315 Forestdale #203
+        Cleveland, OH  44109
+PH#     (216) 741-9407
+
+I look forward to your reply, and thanks for putting out such a fine assembler!
+
+  Greg Roberts
+
+
+Thu Aug  2 16:00:03 1990
+Letter  : 197523    From:
+rsoft!van-bc!uunet.UUCP!mcsun!dtek.chalmers.se!d9thomas
+Subject : Bug in A68k
+
+To: Charlie_Gibbs@mindlink.UUCP
+
+Hi Gibbs!
+
+I downloaded Your program A68k (V2.61) a couple of days ago. I got into trouble
+almost immediately. The symptons was BLink guruing sometimes and it didn't
+resolve RELOC32 correctly. After some debugging I found that A68k generated
+wrong objectfiles. The CODE hunk's RELOC32 references should have pointed to
+within the same hunk, but instead it pointed to the hunk after, and there were
+none and shouldn't have been one. Please correct this bug, because I think
+your assembler is good (it was the first time I used it). To help you I have
+included the program below. I assembled the file:
+        a68k -iassem:assembler_headers mmqtext.a
+
+If you feel for it, please send me a note if this
+bug already is fixed and where to find the new version (FTP address or IP
+number). Thanks!!
+                        Thomas Diding
+
+(d9thomas@dtek.chalmers.se or
+ ..!uunet!mcvax!enea!chalmers!dtek.chalmers.se!d9thomas I think)
+
+
+;*---------------------------------------------------------------------------
+;  :Program.    MMQText.a
+;  :Contents.   Procedure for fast text-output used within MuchMore
+;  :Author.     Fridtjof Siebert
+;  :Address.    Nobileweg 67, D-7-Stgt-40
+;  :Shortcut.   [fbs]
+;  :History.    V 2.0 03-Sep-89 [fbs]
+;  :Copyright.  Public Domain
+;  :Language.   68000 Assembler
+;  :Translator. A68k
+;---------------------------------------------------------------------------*
+
+        include "exec/types.i"
+        include "graphics/gfx.i"
+
+
+        SECTION QText,DATA
+
+        XDEF    _QText          ; QText Procedure
+        XDEF    _GetFontData    ; GetFontData Procedure
+
+
+        SECTION QText,CODE
+
+; BitMap: dc.l  0
+
+;* d1 - vertical position (pixel position)      UWORD
+;* a0 - Pointer to String (0C-Termination)      UBYTE *
+;* a1 - Pointer to BitMap to store String       struct BitMap *
+;* a2 - Pointer to TextFont                     struct FontData *
+;
+;Special codes:
+; 1..16: background color (x-1) & 3, foreground ((x-1) / 4) & 3
+; 17: switch to plain text
+; 18: switch to italics
+; 19: switch to bold
+; 20: switch to italics and bold
+; 21: underline on
+; 22: underline off
+
+; Register use:
+
+; D0: character
+; D1: vertical position
+; D2: bytesperrow
+; D3: to examine character
+; D4: Offset of fontstyle
+; D5: offset (row * bytesperrow)
+
+; A0: points to string
+; A1: plane # 1
+; A2: fontdata
+; A3: character address in font.chardata
+; A4: plane # 2
+; A5: procedure to type in correct color
+; A6: negative character
+
+plane0  EQUR    A1
+plane1  EQUR    A4
+chradr  EQUR    A3
+negchr  EQUR    A6
+colfun  EQUR    A5
+
+char    EQUR    D0
+vertpos EQUR    D1
+bpr     EQUR    D2
+chr2    EQUR    D3
+style   EQUR    D4
+destadr EQUR    D5
+ulinon  EQUR    D6      ; underline on ?
+ulinoff EQUR    D7      ; underline off?
+
+_QText:
+        movem.l A3-A6/D2-D7,-(A7)
+        lea     color04,colfun
+        clr.w   style
+        sf      ulinon
+        st      ulinoff
+
+;       move.l  BitMap,a1               ; do we need this
+        move.w  bm_BytesPerRow(a1),bpr
+        mulu    bpr,vertpos
+        move.l  bm_Planes+4(a1),plane1  ; position in plane #1
+        move.l  bm_Planes(a1),plane0    ; position in plane #0
+        add.l   vertpos,plane0          ; add offset within plane
+        add.l   vertpos,plane1
+
+        move.l  plane0,chradr
+        move.l  plane1,negchr
+        move.w  bpr,vertpos
+        subq.w  #1,vertpos
+clrline:
+        clr.l   (chradr)+               ; clear line
+        clr.l   (chradr)+
+        clr.l   (negchr)+
+        clr.l   (negchr)+
+        dbra    vertpos,clrline
+
+        move.w  bpr,vertpos
+        asl.w   #3,vertpos
+        sub.w   bpr,vertpos             ; vertpos = 7*bpr
+
+loop:
+        move.b  (a0)+,char              ; get character
+        beq     return
+
+        cmp.b   #32,char
+        bcc     \typechr                ; >= 32 (unsigned)
+
+        cmp.b   #17,char
+        bcs     \newcolor               ; < 17 (unsigned)
+
+        cmp.b   #22,char                ; underline off
+        bhi.s   loop                    ; > 22 (unsigned)
+
+        cmp.b   #21,char                ; underline on
+        bcs     \newstyle               ; < 21 (unsigned)
+
+        seq     ulinon
+        sne     ulinoff
+        bra.s   loop
+
+\newstyle:
+        sub.b   #17,char
+        ext.w   char
+        move.w  char,style
+        asl.w   #1,style
+        add.w   char,style
+        asl     #8,style
+        add     style,style             ; style = style * 1536
+        bra     loop
+
+\newcolor:
+        subq.b  #1,char
+        bne     \l0
+        lea     color00,colfun
+        bra     loop
+\l0:
+        subq.b  #1,char
+        bne     \l1
+        lea     color01,colfun
+        bra     loop
+\l1:
+        subq.b  #1,char
+        bne     \l2
+        lea     color02,colfun
+        bra     loop
+\l2:
+        subq.b  #1,char
+        bne     \l3
+        lea     color03,colfun
+        bra     loop
+\l3:
+        subq.b  #1,char
+        bne     \l4
+        lea     color04,colfun
+        bra     loop
+\l4:
+        subq.b  #1,char
+        bne     \l5
+        lea     color05,colfun
+        bra     loop
+\l5:
+        subq.b  #1,char
+        bne     \l6
+        lea     color06,colfun
+        bra     loop
+\l6:
+        subq.b  #1,char
+        bne     \l7
+        lea     color07,colfun
+        bra     loop
+\l7:
+        subq.b  #1,char
+        bne     \l8
+        lea     color08,colfun
+        bra     loop
+\l8:
+        subq.b  #1,char
+        bne     \l9
+        lea     color09,colfun
+        bra     loop
+\l9:
+        subq.b  #1,char
+        bne     \la
+        lea     color10,colfun
+        bra     loop
+\la:
+        subq.b  #1,char
+        bne     \lb
+        lea     color11,colfun
+        bra     loop
+\lb:
+        subq.b  #1,char
+        bne     \lc
+        lea     color12,colfun
+        bra     loop
+\lc:
+        subq.b  #1,char
+        bne     \ld
+        lea     color13,colfun
+        bra     loop
+\ld:
+        subq.b  #1,char
+        bne     \le
+        lea     color14,colfun
+        bra     loop
+\le:
+        lea     color15,colfun
+        bra     loop
+
+\typechr:
+        sub.b   #32,char
+
+        and.w   #$ff,char
+        asl.w   #3,char
+        add.w   style,char
+        lea     0(a2,char.w),chradr
+        lea     $1800(chradr),negchr
+
+        jmp     (colfun)
+
+color00:
+        bra     next
+
+color01:
+        move.b  (negchr)+,(plane0)
+        adda.w  bpr,plane0
+        move.b  (negchr)+,(plane0)
+        adda.w  bpr,plane0
+        move.b  (negchr)+,(plane0)
+        adda.w  bpr,plane0
+        move.b  (negchr)+,(plane0)
+        adda.w  bpr,plane0
+        move.b  (negchr)+,(plane0)
+        adda.w  bpr,plane0
+        move.b  (negchr)+,(plane0)
+        adda.w  bpr,plane0
+        move.b  (negchr)+,(plane0)
+        adda.w  bpr,plane0
+        move.b  (negchr)+,(plane0)
+        and.b   ulinoff,(plane0)
+        suba.w  vertpos,plane0
+        bra     next
+
+color02:
+        move.b  (negchr)+,(plane1)
+        adda.w  bpr,plane1
+        move.b  (negchr)+,(plane1)
+        adda.w  bpr,plane1
+        move.b  (negchr)+,(plane1)
+        adda.w  bpr,plane1
+        move.b  (negchr)+,(plane1)
+        adda.w  bpr,plane1
+        move.b  (negchr)+,(plane1)
+        adda.w  bpr,plane1
+        move.b  (negchr)+,(plane1)
+        adda.w  bpr,plane1
+        move.b  (negchr)+,(plane1)
+        adda.w  bpr,plane1
+        move.b  (negchr)+,(plane1)
+        and.b   ulinoff,(plane1)
+        suba.w  vertpos,plane1
+        bra     next
+
+color03:
+        move.b  (negchr),(plane0)
+        move.b  (negchr)+,(plane1)
+        move    bpr,destadr
+        move.b  (negchr),0(plane0,destadr)
+        move.b  (negchr)+,0(plane1,destadr)
+        add     bpr,destadr
+        move.b  (negchr),0(plane0,destadr)
+        move.b  (negchr)+,0(plane1,destadr)
+        add     bpr,destadr
+        move.b  (negchr),0(plane0,destadr)
+        move.b  (negchr)+,0(plane1,destadr)
+        add     bpr,destadr
+        move.b  (negchr),0(plane0,destadr)
+        move.b  (negchr)+,0(plane1,destadr)
+        add     bpr,destadr
+        move.b  (negchr),0(plane0,destadr)
+        move.b  (negchr)+,0(plane1,destadr)
+        add     bpr,destadr
+        move.b  (negchr),0(plane0,destadr)
+        move.b  (negchr)+,0(plane1,destadr)
+        add     bpr,destadr
+        move.b  (negchr),0(plane0,destadr)
+        move.b  (negchr)+,0(plane1,destadr)
+        and.b   ulinoff,0(plane0,destadr)
+        and.b   ulinoff,0(plane1,destadr)
+        bra     next
+
+color04:
+        move.b  (chradr)+,(plane0)
+        adda.w  bpr,plane0
+        move.b  (chradr)+,(plane0)
+        adda.w  bpr,plane0
+        move.b  (chradr)+,(plane0)
+        adda.w  bpr,plane0
+        move.b  (chradr)+,(plane0)
+        adda.w  bpr,plane0
+        move.b  (chradr)+,(plane0)
+        adda.w  bpr,plane0
+        move.b  (chradr)+,(plane0)
+        adda.w  bpr,plane0
+        move.b  (chradr)+,(plane0)
+        adda.w  bpr,plane0
+        move.b  (chradr)+,(plane0)
+        or.b    ulinon,(plane0)
+        suba.w  vertpos,plane0
+        bra     next
+
+color05:
+        st      (plane0)
+        move    bpr,destadr
+        st      0(plane0,destadr)
+        add     bpr,destadr
+        st      0(plane0,destadr)
+        add     bpr,destadr
+        st      0(plane0,destadr)
+        add     bpr,destadr
+        st      0(plane0,destadr)
+        add     bpr,destadr
+        st      0(plane0,destadr)
+        add     bpr,destadr
+        st      0(plane0,destadr)
+        add     bpr,destadr
+        st      0(plane0,destadr)
+        bra     next
+
+color06:
+        move.b  (chradr)+,(plane0)
+        move.b  (negchr)+,(plane1)
+        move    bpr,destadr
+        move.b  (chradr)+,0(plane0,destadr)
+        move.b  (negchr)+,0(plane1,destadr)
+        add     bpr,destadr
+        move.b  (chradr)+,0(plane0,destadr)
+        move.b  (negchr)+,0(plane1,destadr)
+        add     bpr,destadr
+        move.b  (chradr)+,0(plane0,destadr)
+        move.b  (negchr)+,0(plane1,destadr)
+        add     bpr,destadr
+        move.b  (chradr)+,0(plane0,destadr)
+        move.b  (negchr)+,0(plane1,destadr)
+        add     bpr,destadr
+        move.b  (chradr)+,0(plane0,destadr)
+        move.b  (negchr)+,0(plane1,destadr)
+        add     bpr,destadr
+        move.b  (chradr)+,0(plane0,destadr)
+        move.b  (negchr)+,0(plane1,destadr)
+        add     bpr,destadr
+        move.b  (chradr)+,0(plane0,destadr)
+        move.b  (negchr)+,0(plane1,destadr)
+        or.b    ulinon,0(plane0,destadr)
+        and.b   ulinoff,0(plane1,destadr)
+        bra     next
+
+color07:
+        st      (plane0)
+        move.b  (negchr)+,(plane1)
+        move    bpr,destadr
+        st      0(plane0,destadr)
+        move.b  (negchr)+,0(plane1,destadr)
+        add     bpr,destadr
+        st      0(plane0,destadr)
+        move.b  (negchr)+,0(plane1,destadr)
+        add     bpr,destadr
+        st      0(plane0,destadr)
+        move.b  (negchr)+,0(plane1,destadr)
+        add     bpr,destadr
+        st      0(plane0,destadr)
+        move.b  (negchr)+,0(plane1,destadr)
+        add     bpr,destadr
+        st      0(plane0,destadr)
+        move.b  (negchr)+,0(plane1,destadr)
+        add     bpr,destadr
+        st      0(plane0,destadr)
+        move.b  (negchr)+,0(plane1,destadr)
+        add     bpr,destadr
+        st      0(plane0,destadr)
+        move.b  (negchr)+,0(plane1,destadr)
+        and.b   ulinoff,0(plane1,destadr)
+        bra     next
+
+color08:
+        move.b  (chradr)+,(plane1)
+        adda.w  bpr,plane1
+        move.b  (chradr)+,(plane1)
+        adda.w  bpr,plane1
+        move.b  (chradr)+,(plane1)
+        adda.w  bpr,plane1
+        move.b  (chradr)+,(plane1)
+        adda.w  bpr,plane1
+        move.b  (chradr)+,(plane1)
+        adda.w  bpr,plane1
+        move.b  (chradr)+,(plane1)
+        adda.w  bpr,plane1
+        move.b  (chradr)+,(plane1)
+        adda.w  bpr,plane1
+        move.b  (chradr)+,(plane1)
+        or.b    ulinon,(plane1)
+        suba.w  vertpos,plane1
+        bra     next
+
+color09:
+        move.b  (negchr)+,(plane0)
+        move.b  (chradr)+,(plane1)
+        move    bpr,destadr
+        move.b  (negchr)+,0(plane0,destadr)
+        move.b  (chradr)+,0(plane1,destadr)
+        add     bpr,destadr
+        move.b  (negchr)+,0(plane0,destadr)
+        move.b  (chradr)+,0(plane1,destadr)
+        add     bpr,destadr
+        move.b  (negchr)+,0(plane0,destadr)
+        move.b  (chradr)+,0(plane1,destadr)
+        add     bpr,destadr
+        move.b  (negchr)+,0(plane0,destadr)
+        move.b  (chradr)+,0(plane1,destadr)
+        add     bpr,destadr
+        move.b  (negchr)+,0(plane0,destadr)
+        move.b  (chradr)+,0(plane1,destadr)
+        add     bpr,destadr
+        move.b  (negchr)+,0(plane0,destadr)
+        move.b  (chradr)+,0(plane1,destadr)
+        add     bpr,destadr
+        move.b  (negchr)+,0(plane0,destadr)
+        move.b  (chradr)+,0(plane1,destadr)
+        and.b   ulinoff,0(plane0,destadr)
+        or.b    ulinon,0(plane1,destadr)
+        bra     next
+
+color10:
+        st      (plane1)
+        adda.w  bpr,plane1
+        st      (plane1)
+        adda.w  bpr,plane1
+        st      (plane1)
+        adda.w  bpr,plane1
+        st      (plane1)
+        adda.w  bpr,plane1
+        st      (plane1)
+        adda.w  bpr,plane1
+        st      (plane1)
+        adda.w  bpr,plane1
+        st      (plane1)
+        adda.w  bpr,plane1
+        st      (plane1)
+        suba.w  vertpos,plane1
+        bra     next
+
+color11:
+        move.b  (negchr)+,(plane0)
+        st      (plane1)
+        move    bpr,destadr
+        move.b  (negchr)+,0(plane0,destadr)
+        st      0(plane1,destadr)
+        add     bpr,destadr
+        move.b  (negchr)+,0(plane0,destadr)
+        st      0(plane1,destadr)
+        add     bpr,destadr
+        move.b  (negchr)+,0(plane0,destadr)
+        st      0(plane1,destadr)
+        add     bpr,destadr
+        move.b  (negchr)+,0(plane0,destadr)
+        st      0(plane1,destadr)
+        add     bpr,destadr
+        move.b  (negchr)+,0(plane0,destadr)
+        st      0(plane1,destadr)
+        add     bpr,destadr
+        move.b  (negchr)+,0(plane0,destadr)
+        st      0(plane1,destadr)
+        add     bpr,destadr
+        move.b  (negchr)+,0(plane0,destadr)
+        st      0(plane1,destadr)
+        and.b   ulinoff,0(plane0,destadr)
+        bra     next
+
+color12:
+        move.b  (chradr),(plane0)
+        move.b  (chradr)+,(plane1)
+        move    bpr,destadr
+        move.b  (chradr),0(plane0,destadr)
+        move.b  (chradr)+,0(plane1,destadr)
+        add     bpr,destadr
+        move.b  (chradr),0(plane0,destadr)
+        move.b  (chradr)+,0(plane1,destadr)
+        add     bpr,destadr
+        move.b  (chradr),0(plane0,destadr)
+        move.b  (chradr)+,0(plane1,destadr)
+        add     bpr,destadr
+        move.b  (chradr),0(plane0,destadr)
+        move.b  (chradr)+,0(plane1,destadr)
+        add     bpr,destadr
+        move.b  (chradr),0(plane0,destadr)
+        move.b  (chradr)+,0(plane1,destadr)
+        add     bpr,destadr
+        move.b  (chradr),0(plane0,destadr)
+        move.b  (chradr)+,0(plane1,destadr)
+        add     bpr,destadr
+        move.b  (chradr),0(plane0,destadr)
+        move.b  (chradr)+,0(plane1,destadr)
+        or.b    ulinon,0(plane0,destadr)
+        or.b    ulinon,0(plane1,destadr)
+        bra     next
+
+color13:
+        st      (plane0)
+        move.b  (chradr)+,(plane1)
+        move    bpr,destadr
+        st      0(plane0,destadr)
+        move.b  (chradr)+,0(plane1,destadr)
+        add     bpr,destadr
+        st      0(plane0,destadr)
+        move.b  (chradr)+,0(plane1,destadr)
+        add     bpr,destadr
+        st      0(plane0,destadr)
+        move.b  (chradr)+,0(plane1,destadr)
+        add     bpr,destadr
+        st      0(plane0,destadr)
+        move.b  (chradr)+,0(plane1,destadr)
+        add     bpr,destadr
+        st      0(plane0,destadr)
+        move.b  (chradr)+,0(plane1,destadr)
+        add     bpr,destadr
+        st      0(plane0,destadr)
+        move.b  (chradr)+,0(plane1,destadr)
+        add     bpr,destadr
+        st      0(plane0,destadr)
+        move.b  (chradr)+,0(plane1,destadr)
+        or.b    ulinon,0(plane1,destadr)
+        bra     next
+
+color14:
+        move.b  (chradr)+,(plane0)
+        st      (plane1)
+        move    bpr,destadr
+        move.b  (chradr)+,0(plane0,destadr)
+        st      0(plane1,destadr)
+        add     bpr,destadr
+        move.b  (chradr)+,0(plane0,destadr)
+        st      0(plane1,destadr)
+        add     bpr,destadr
+        move.b  (chradr)+,0(plane0,destadr)
+        st      0(plane1,destadr)
+        add     bpr,destadr
+        move.b  (chradr)+,0(plane0,destadr)
+        st      0(plane1,destadr)
+        add     bpr,destadr
+        move.b  (chradr)+,0(plane0,destadr)
+        st      0(plane1,destadr)
+        add     bpr,destadr
+        move.b  (chradr)+,0(plane0,destadr)
+        st      0(plane1,destadr)
+        add     bpr,destadr
+        move.b  (chradr)+,0(plane0,destadr)
+        st      0(plane1,destadr)
+        or.b    ulinon,0(plane0,destadr)
+        bra     next
+
+color15:
+        st      (plane0)
+        st      (plane1)
+        move    bpr,destadr
+        st      0(plane0,destadr)
+        st      0(plane1,destadr)
+        add     bpr,destadr
+        st      0(plane0,destadr)
+        st      0(plane1,destadr)
+        add     bpr,destadr
+        st      0(plane0,destadr)
+        st      0(plane1,destadr)
+        add     bpr,destadr
+        st      0(plane0,destadr)
+        st      0(plane1,destadr)
+        add     bpr,destadr
+        st      0(plane0,destadr)
+        st      0(plane1,destadr)
+        add     bpr,destadr
+        st      0(plane0,destadr)
+        st      0(plane1,destadr)
+        add     bpr,destadr
+        st      0(plane0,destadr)
+        st      0(plane1,destadr)
+
+next:
+        addq    #1,plane0
+        addq    #1,plane1
+        bra     loop
+
+return:
+        movem.l (A7)+,A3-A6/D2-D7
+        rts
+
+;---------------------------------------------------------------------------*)
+; GetFontData
+
+; A0: Pointer to font's chardata
+; A1: Pointer to fontdata-Array
+; D7: Line Modulo
+
+ch      EQUR    A0
+fd      EQUR    A1
+ad      EQUR    A2
+j       EQUR    D0
+x       EQUR    D1
+c       EQUR    D2
+d       EQUR    D3
+e       EQUR    D4
+x1      EQUR    D5
+x2      EQUR    D6
+x3      EQUR    D7
+
+_GetFontData:
+
+        movem.l A2/D2-D6,-(A7)
+        move.w  D7,-(A7)
+        move    #0,j
+jloop:  move    j,x
+        asl     #3,x
+        move    x,x1
+        move    x,x2
+        move    x,x3
+        add     #$600,x1
+        add     #$c00,x2
+        add     #$1200,x3
+        lea     0(ch,j),ad
+; Byte 0:
+        move.b  (ad),c
+        move.b  c,0(fd,x)
+        move.b  c,d
+        lsr.b   #2,d
+        bcc     \1
+        bset    #0,d
+\1:     move.b  d,0(fd,x1)
+        move.b  c,e
+        lsr.b   #1,e
+        or.b    c,e
+        move.b  e,0(fd,x2)
+        move.b  d,e
+        lsr.b   #1,e
+        or.b    d,e
+        move.b  e,0(fd,x3)
+; Byte 1:
+        adda.w  (A7),ad
+        move.b  (ad),c
+        move.b  c,1(fd,x)
+        move.b  c,d
+        lsr.b   #2,d
+        bcc     \2
+        bset    #0,d
+\2:     move.b  d,1(fd,x1)
+        move.b  c,e
+        lsr.b   #1,e
+        or.b    c,e
+        move.b  e,1(fd,x2)
+        move.b  d,e
+        lsr.b   #1,e
+        or.b    d,e
+        move.b  e,1(fd,x3)
+; Byte 2:
+        adda.w  (A7),ad
+        move.b  (ad),c
+        move.b  c,2(fd,x)
+        move.b  c,d
+        lsr.b   #1,d
+        bcc     \3
+        bset    #0,d
+\3:     move.b  d,2(fd,x1)
+        move.b  c,e
+        lsr.b   #1,e
+        or.b    c,e
+        move.b  e,2(fd,x2)
+        move.b  d,e
+        lsr.b   #1,e
+        or.b    d,e
+        move.b  e,2(fd,x3)
+; Byte 3:
+        adda.w  (A7),ad
+        move.b  (ad),c
+        move.b  c,3(fd,x)
+        move.b  c,d
+        lsr.b   #1,d
+        bcc     \4
+        bset    #0,d
+\4:     move.b  d,3(fd,x1)
+        move.b  c,e
+        lsr.b   #1,e
+        or.b    c,e
+        move.b  e,3(fd,x2)
+        move.b  d,e
+        lsr.b   #1,e
+        or.b    d,e
+        move.b  e,3(fd,x3)
+; Byte 4:
+        adda.w  (A7),ad
+        move.b  (ad),c
+        move.b  c,4(fd,x)
+        move.b  c,4(fd,x1)
+        move.b  c,e
+        lsr.b   #1,e
+        or.b    c,e
+        move.b  e,4(fd,x2)
+        move.b  e,4(fd,x3)
+; Byte 5:
+        adda.w  (A7),ad
+        move.b  (ad),c
+        move.b  c,5(fd,x)
+        move.b  c,5(fd,x1)
+        move.b  c,e
+        lsr.b   #1,e
+        or.b    c,e
+        move.b  e,5(fd,x2)
+        move.b  e,5(fd,x3)
+; Byte 6:
+        adda.w  (A7),ad
+        move.b  (ad),c
+        move.b  c,6(fd,x)
+        move.b  c,d
+        lsl.b   #1,d
+        bcc     \7
+        bset    #7,d
+\7:     move.b  d,6(fd,x1)
+        move.b  c,e
+        lsr.b   #1,e
+        or.b    c,e
+        move.b  e,6(fd,x2)
+        move.b  d,e
+        lsr.b   #1,e
+        or.b    d,e
+        move.b  e,6(fd,x3)
+; Byte 7:
+        adda.w  (A7),ad
+        move.b  (ad),c
+        move.b  c,7(fd,x)
+        move.b  c,d
+        lsl.b   #1,d
+        bcc     \8
+        bset    #7,d
+\8:     move.b  d,7(fd,x1)
+        move.b  c,e
+        lsr.b   #1,e
+        or.b    c,e
+        move.b  e,7(fd,x2)
+        move.b  d,e
+        lsr.b   #1,e
+        or.b    d,e
+        move.b  e,7(fd,x3)
+
+        addq    #1,j
+        move    j,x
+        cmp     #$30,x
+        beq.s   newlin
+        cmp     #$60,x
+        beq.s   newlin
+        cmp     #$90,x
+        bne.s   nextl
+newlin: move    (A7),x
+        asl     #3,x
+        sub     #$30,x
+        adda.w  x,ch
+nextl:  cmp     #$c0,j
+        blt     jloop
+
+        move.l  fd,ad
+        adda.w  #$1800,ad
+        move    #$5ff,j
+invers: move.l  (fd)+,c
+        not.l   c
+        move.l  c,(ad)+
+        dbra    j,invers
+        movem.l (A7)+,A2/D2-D6
+        lea     2(A7),A7
+        rts
+
+        END
+
+
+Mon Oct 22 17:28:04 1990
+Letter  : ????    To: rsoft!van-bc!uunet.UUCP!mcsun!puukko.hut.fi!s37732v
+Subject : a68k_Bug
+
+     Hi there.  Glad to see A68k has made it to your part of the
+world.  I think I've tracked down your problem.  A68k stores the
+values on the -w parameter as longs, then casts them to unsigned
+when calling malloc().  Values of over 65535 get truncated, and
+can give strange results.  I'll make a note of this and put in a
+check for this in the next version.
+
+     Actually, you probably don't even have to bother with the -w
+parameter at all.  The first number is just used to tune the hashing
+algorithm; at worst A68k will run a bit inefficiently if it's not a
+good value, but it'll never crash.  The second parameter only needs
+to be specified if you're using very deeply nested macros or
+INCLUDE files, or have very complex arithmetic expressions in your
+operands.  The default value should be large enough for just about
+anything you'll encounter.  But again I agree that a strange value
+should get a nicer reaction than a crash.
+
+
+Mon Dec 17 21:01:35 1990
+Message : #1101940    From: bytey@phoenix.pub.uu.oz.au
+Group   : AMIGA.Net-Tech
+Length  : 116 words
+Subject : addx/subx/movep/Metascope/A68k
+
+Msg-ID: <1990Dec17.031120.3658@phoenix.pub.uu.oz.au>
+Posted: 17 Dec 90 03:11:20 GMT
+
+Org.  : Phoenix ComSystem. Public UNIX Melbourne Australia.
+Person: Chris Hames [bytey]
+
+
+   Is it common knowledge that the addx/subx instructions don't set the
+zero flag when the result is zero but clear it if the result is not zero?
+Why didn't someone tell me!!!!!!!!!!!!  hours hours hours debugging.....
+
+   Charlie Gibb-A68k2.42 movep.w 1(a0),d0  gives and alignment error when it is
+valid instruction.  Thanks for a nice assembler.
+
+   Is Metadigm still alive?  Has there been an update of Metascope Debugger
+since 1.17 ?   Is there address still :-
+
+          19762 MacArthur Blvd
+          Suite 300
+          Irvine, CA 92715
+
+Thanks in advance,
+--
+Chris Hames - C/Assembler programmer | Fish: DirWork,FSDirs,VMK..|  /~\/ \
+              3:633/353  (Fido)      | Commercial:  Soon...      | (  OZ  )
+mail bytey@phoenix.pub.uu.oz.au      +---------------------------+ `--'\_/
+mail uunet.uu.net!phoenix.pub.uu.oz.au!bytey (If header doesn't work!)  o
+
+
+Message #2497 "CLUB_AMIGA" (Read: 23)
+Date:  3 Jan 91 18:48:00
+From: Sam Yee
+  To: Charlie Gibbs
+Subj: Re: A68kv2.62
+
+I think I found a problem with your assembler.  I've tried several 
+addressing modes of 'MULU' and 'MULS' and when I diassembled it I get 
+something like 'ORI.W xx,yy).  I am not kidding, the assemble did in 
+fact generated incorrect code.  Please have a look, and put it on your 
+'to do' list...  Thanks in advance... 
+  
+-Sam 
+
+
+Message #4336 "E-Mail" (Read: 3)
+Date:  7 Jan 91 18:54:18
+From: Jeremy McDonald <Private>
+  To: Charlie Gibbs <Received>
+Subj: Re: a68k2.62
+
+Sorry.  Found another one.  moveq.w shouldn't be accepted (it's illegal). 
+
+Message is reply to #4334.
+
+Message Command: R
+
+Do you wish to quote text from the original message? [y/N] No
+
+Attach file? [y/N] No
+               To: Jeremy McDonald
+          Subject: Re: a68k2.62
+
+Press enter by itself to keep this subject.
+
+          Subject: 
+
+ParaText: All commands are preceded by '/'.
+/S saves, /A aborts.  Do '/?' for a full list of commands.
+There are 150 lines available.
+
+ 1) Argh.  Thanks (I guess).  --CJG
+ 2)     Ed> Saving...
+
+
+Message #4463 "E-Mail" (Read: 5)
+Date: 21 Jan 91 17:05:12
+From: Jeremy McDonald <Private>
+  To: Charlie Gibbs <Received>
+Subj: a68k
+
+Found a couple more bugs. (terrific, eh?)  It doesn't trap multiply 
+defined symbols within include files.  Traps 'em fine in the main prog, 
+but doesn't trap 'em within include files.  Also, don't know whether 
+this is a bug or feature, but it doesn't trap multiply defined labels 
+(if you have a macro and label with the same name).  Metacomco one does. 
+Nice feature to add would be to change the update of current line 
+display to 100's instead of 10's when assembling.  Save some time 
+assembling (these nanoseconds add up, heh). 

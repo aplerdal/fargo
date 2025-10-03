@@ -1,0 +1,55 @@
+GCC	= gcc
+GCC-DOS	= /usr/i686-pc-msdosdjgpp/bin/gcc
+DJP-DOS = /usr/i686-pc-msdosdjgpp/bin/djp
+
+CFLAGS = -O3 -s
+
+DOCC = module: module.o;\
+	$(GCC) $(CFLAGS) -o module module.o
+
+DOCC-DOS = module.exe: module.obj;\
+	$(GCC-DOS) $(CFLAGS) -o module.exe module.obj;\
+	$(DJP-DOS) module.exe
+
+all: romconv sum92 flinker autofarg afcompat pfcompat
+all: romconv.exe sum92.exe flinker.exe
+
+.SUFFIXES: .obj
+
+.c.o:;  $(GCC) $(CFLAGS) -c $< -o $@
+.cc.o:; $(GCC) $(CFLAGS) -c $< -o $@
+
+.c.obj:;  $(GCC-DOS) $(CFLAGS) -c $< -o $@
+.cc.obj:; $(GCC-DOS) $(CFLAGS) -c $< -o $@
+
+$(subst module,romconv,$(DOCC))
+$(subst module,romconv,$(DOCC-DOS))
+
+$(subst module,sum92,$(DOCC))
+$(subst module,sum92,$(DOCC-DOS))
+
+FLINKER_OBJ = flinker.o flinkerObj.o flinker92p.o flinker92b.o flinker9xz.o flinkerOld92p.o gnu/getopt.o gnu/getopt1.o
+
+FLINKER_OBJ-DOS = $(FLINKER_OBJ:.o=.obj)
+
+flinker: $(FLINKER_OBJ)
+	$(GCC) $(CFLAGS) -o $@ $(FLINKER_OBJ)
+
+flinker.exe: $(FLINKER_OBJ-DOS)
+	$(GCC-DOS) $(CFLAGS) -o $@ $(FLINKER_OBJ-DOS)
+	$(DJP-DOS) $@
+
+autofarg:; ln -fs autofargo $@
+afcompat:; ln -fs autofargo-compat $@
+pfcompat:; ln -fs putfargo-compat $@
+
+sum92.o: endian.h
+
+flinker.o: flinker.h endian.h lists.h hash.h
+flinkerObj.o: flinker.h endian.h lists.h hash.h
+flinker92p.o: flinker.h endian.h lists.h hash.h
+flinker92b.o: flinker.h endian.h lists.h hash.h romtab.h
+
+clean:; rm -f romconv.o romconv romconv.obj romconv.exe \
+	      sum92.o sum92 sum92.obj sum92.exe \
+	      $(FLINKER_OBJ) flinker $(FLINKER_OBJ-DOS) flinker.exe core

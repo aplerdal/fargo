@@ -1,0 +1,1 @@
+$FARGO/a68k/A68k -q -g -t -i$FARGO/asm/include $*

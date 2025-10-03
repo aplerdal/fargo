@@ -1,0 +1,7 @@
+    	include	"oldfargo.h"
+
+	xdef	_main
+	xdef	_comment
+
+_main		equ	\1
+_comment	equ	\2

@@ -1,0 +1,11 @@
+\1,frame_rect
+\1,erase_rect
+\1,show_dialog
+\1,clear_dialog
+\1,clr_scr
+\1,idle_loop
+\1,random
+\1,find_pixel
+\1,pixel_on
+\1,pixel_off
+\1,pixel_chg

@@ -1,0 +1,8 @@
+#!/bin/sh
+get92b $FARGO/fargo.92b
+if [ $? = 1 ]; then exit; fi
+putfargo $FARGO/fargo.92b
+if [ $? = 1 ]; then exit; fi
+put92 $FARGO/fargo.92b
+sleep 1
+put92 $FARGO/asm/lib/*.92p $FARGO/asm/prgm/*.92p

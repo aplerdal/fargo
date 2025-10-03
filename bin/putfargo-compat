@@ -1,0 +1,5 @@
+#!/bin/sh
+if $FARGO/bin/flinker -vb $1 $FARGO/asm/kernel/kernel.o $FARGO/asm/kernel/tios.o $FARGO/asm/kernel/0_1_x.o
+then
+  echo Successfully put Fargo kernel in $1, with Fargo 0.1.x compatibility
+fi

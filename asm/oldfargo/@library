@@ -1,0 +1,7 @@
+	include	"oldfargo.h"
+
+	xdef	_library
+_library	dc.b	"\1",0
+		ds.w	0
+
+	index_library	\1
